@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>The Last House — 3D Horror Film</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#050609;color:#eee;font:14px/1.5 system-ui,Arial;overflow:hidden}
+#stage{position:fixed;inset:0}canvas{display:block;width:100%;height:100%}
+#hud{position:fixed;inset:0;pointer-events:none;display:flex;flex-direction:column;justify-content:space-between;padding:22px}
+.top{display:flex;justify-content:space-between;align-items:flex-start;gap:16px}.brand{letter-spacing:.22em;text-transform:uppercase;font-size:11px;color:#c6c0b5}.title{font:clamp(24px,4vw,48px)/1.05 Georgia,serif;letter-spacing:.05em;margin-top:8px;text-shadow:0 2px 18px #000}
+#chapter{color:#d7c7a6;font-size:12px;letter-spacing:.18em;text-transform:uppercase}
+#subtitle{align-self:center;max-width:850px;text-align:center;font:clamp(17px,2.4vw,27px)/1.35 Georgia,serif;text-shadow:0 2px 12px #000,0 0 28px #000;min-height:3em;padding:0 18px}
+.bottom{display:flex;justify-content:space-between;align-items:end;gap:14px;color:#b7b3aa;font-size:11px;letter-spacing:.12em;text-transform:uppercase}
+#controls{position:fixed;z-index:4;left:50%;bottom:18px;transform:translateX(-50%);display:flex;gap:8px;flex-wrap:wrap;justify-content:center;width:min(94vw,900px);pointer-events:auto}
+button{border:1px solid #6f6657;background:#111319e8;color:#eee;padding:10px 14px;border-radius:4px;cursor:pointer;font-weight:650;letter-spacing:.04em}
+button:hover{background:#28231e}button.primary{background:#6b211e;border-color:#a24a40}
+#panel{position:fixed;z-index:5;right:18px;top:18px;background:#090b10e8;border:1px solid #51483b;padding:12px 14px;width:min(280px,88vw);font-size:12px;color:#c9c4b9}
+#panel strong{color:#fff}#progress{height:3px;background:#292929;margin-top:9px}#bar{height:100%;width:0;background:#a64b40}
+#vignette{position:fixed;inset:0;pointer-events:none;background:radial-gradient(ellipse at center,transparent 35%,#0009 100%);mix-blend-mode:multiply}
+#flash{position:fixed;inset:0;background:#fff;opacity:0;pointer-events:none}
+@media(max-width:600px){#hud{padding:14px}.bottom{display:none}#panel{top:auto;bottom:84px;right:10px;width:190px}button{padding:9px 10px;font-size:11px}}
+</style>
+</head>
+<body>
+<div id="stage"></div><div id="vignette"></div><div id="flash"></div>
+<div id="hud"><div class="top"><div><div class="brand">A short horror film · 3D realtime</div><div class="title">THE LAST HOUSE</div></div><div id="chapter">Chapter 01 · The Call</div></div><div id="subtitle">Some roads should never be taken after midnight.</div><div class="bottom"><span>Wear headphones for the full experience</span><span>Fictional story · Hinglish narration</span></div></div>
+<div id="panel"><strong>FILM CONTROLS</strong><br>Play the 5-minute sequence. Audio is generated in-browser. Enable sound after pressing Play.<div id="progress"><div id="bar"></div></div><div id="status">Ready · 00:00 / 05:00</div></div>
+<div id="controls"><button class="primary" id="play">▶ Play film</button><button id="pause">Ⅱ Pause</button><button id="restart">↺ Restart</button><button id="sound">♪ Sound: on</button><button id="record">● Record video</button></div>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"}}</script>
+<script type="module">
+import * as THREE from 'three';
+const mount=document.querySelector('#stage'), subtitle=document.querySelector('#subtitle'), chapter=document.querySelector('#chapter'),bar=document.querySelector('#bar'),status=document.querySelector('#status'),flash=document.querySelector('#flash');
+const scene=new THREE.Scene();scene.background=new THREE.Color(0x030509);scene.fog=new THREE.FogExp2(0x080b10,.035);
+const camera=new THREE.PerspectiveCamera(55,innerWidth/innerHeight,.1,180);camera.position.set(0,3,15);
+const renderer=new THREE.WebGLRenderer({antialias:true,alpha:false,preserveDrawingBuffer:true});renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.setSize(innerWidth,innerHeight);renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.15;mount.appendChild(renderer.domElement);
+scene.add(new THREE.HemisphereLight(0x7a8798,0x080606,1.1));
+const moon=new THREE.DirectionalLight(0x9ab2d5,2.0);moon.position.set(-8,14,7);moon.castShadow=true;scene.add(moon);
+const warm=new THREE.PointLight(0xff9b4a,0,18,2);warm.position.set(0,3,1);scene.add(warm);
+const ground=new THREE.Mesh(new THREE.PlaneGeometry(200,200),new THREE.MeshStandardMaterial({color:0x101512,roughness:1}));ground.rotation.x=-Math.PI/2;ground.position.y=-.15;ground.receiveShadow=true;scene.add(ground);
+function mat(c,r=1,metal=0){return new THREE.MeshStandardMaterial({color:c,roughness:r,metalness:metal})}
+const wood=mat(0x211b19),wall=mat(0x252323),roofmat=mat(0x111316),glass=new THREE.MeshStandardMaterial({color:0x111b24,emissive:0x090d16,roughness:.25});
+function box(w,h,d,m,x,y,z){const o=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),m);o.position.set(x,y,z);o.castShadow=true;o.receiveShadow=true;scene.add(o);return o}
+function makeHouse(){
+ box(8,5,5,wall,0,2.35,-16);box(8.8,.45,5.8,roofmat,0,5.05,-16);
+ const g=new THREE.ConeGeometry(5.2,2.5,4);const roof=new THREE.Mesh(g,roofmat);roof.rotation.y=Math.PI/4;roof.position.set(0,6.15,-16);roof.scale.set(1,.65,.8);roof.castShadow=true;scene.add(roof);
+ for(let x of [-2.2,2.2]){box(1.2,2.2,.18,wood,x,1.05,-13.42);box(.42,.7,.08,glass,x,2.65,-13.39)}
+ box(1.4,2.8,.2,wood,0,1.25,-13.35);const knob=new THREE.Mesh(new THREE.SphereGeometry(.07,12,12),mat(0xa27a43,.3,.5));knob.position.set(.48,1.2,-13.2);scene.add(knob);
+ // broken porch and steps
+ box(9,.25,2,wood,0,.25,-12.2);for(let i=0;i<3;i++)box(5-i*.7,.25,.55,wood,0,-.05-i*.23,-10.9+i*.5);
+ // porch posts
+ for(let x of [-3.7,3.7])box(.18,4,.18,wood,x,2.2,-12.8);
+}
+makeHouse();
+// Forest: irregular trunks, branches and low-poly canopy clusters
+const bark=mat(0x171a17),leaves=[mat(0x101713),mat(0x151c18),mat(0x1c211c)];
+for(let i=0;i<100;i++){const x=(Math.random()-.5)*75,z=-Math.random()*65-2;if(Math.abs(x)<5&&z>-25)continue;const h=5+Math.random()*9,r=.22+Math.random()*.42;const trunk=new THREE.Mesh(new THREE.CylinderGeometry(r*.65,r,h,7),bark);trunk.position.set(x,h/2-.1,z);trunk.castShadow=true;scene.add(trunk);for(let j=0;j<3;j++){const crown=new THREE.Mesh(new THREE.IcosahedronGeometry(1.8+Math.random()*1.5,1),leaves[Math.floor(Math.random()*3)]);crown.position.set(x+(Math.random()-.5)*1.8,h*.72+j*.65,z);crown.scale.set(1,1.1,1);crown.castShadow=true;scene.add(crown)}}
+ // road
+const road=new THREE.Mesh(new THREE.PlaneGeometry(8,80),mat(0x17191a));road.rotation.x=-Math.PI/2;road.position.set(0,-.08,-25);scene.add(road);
+// path stones
+for(let i=0;i<24;i++){const s=new THREE.Mesh(new THREE.BoxGeometry(1.1,.08,.5),mat(0x292b29));s.position.set((Math.random()-.5)*3,-.02,-i*1.2-1);s.rotation.y=Math.random()*.4;scene.add(s)}
+// Mist sprites
+const mistMat=new THREE.MeshBasicMaterial({color:0x9ba9ad,transparent:true,opacity:.055,depthWrite:false});
+for(let i=0;i<20;i++){const m=new THREE.Mesh(new THREE.PlaneGeometry(10,2.5),mistMat);m.position.set((Math.random()-.5)*20,.5+Math.random()*2,-Math.random()*40);m.rotation.y=Math.random()*.4;scene.add(m);m.userData.speed=.2+Math.random()*.3;m.userData.phase=Math.random()*6}
+ // rain particles
+const rainCount=2200,rainGeo=new THREE.BufferGeometry(),rainPos=new Float32Array(rainCount*3);
+for(let i=0;i<rainCount;i++){rainPos[i*3]=(Math.random()-.5)*45;rainPos[i*3+1]=Math.random()*18;rainPos[i*3+2]=Math.random()*35-35}
+rainGeo.setAttribute('position',new THREE.BufferAttribute(rainPos,3));const rain=new THREE.Points(rainGeo,new THREE.PointsMaterial({color:0x9aa9b8,size:.045,transparent:true,opacity:.55}));scene.add(rain);
+// ghost: translucent shrouded figure
+const ghost=new THREE.Group();const ghostMat=new THREE.MeshStandardMaterial({color:0xc9d3d4,transparent:true,opacity:.0,roughness:.4,emissive:0x18232a,side:THREE.DoubleSide});
+const robe=new THREE.Mesh(new THREE.ConeGeometry(.9,3.2,9,3),ghostMat);robe.position.y=1.55;ghost.add(robe);
+const head=new THREE.Mesh(new THREE.SphereGeometry(.48,16,12),ghostMat);head.position.y=3.25;ghost.add(head);
+const eyeMat=new THREE.MeshBasicMaterial({color:0xff2525});for(let x of [-.17,.17]){const e=new THREE.Mesh(new THREE.SphereGeometry(.055,8,8),eyeMat);e.position.set(x,3.3,.43);ghost.add(e)}
+ghost.position.set(0,0,-12);ghost.visible=false;scene.add(ghost);
+// distant silhouettes
+for(let i=0;i<5;i++){const s=new THREE.Mesh(new THREE.ConeGeometry(.35,2.1,6),mat(0x080b0a));s.position.set((Math.random()-.5)*24,1,-20-Math.random()*25);scene.add(s)}
+// Audio: eerie drone, wind, rain and synthesized sting. No external copyrighted tracks.
+let audioCtx=null,master=null,muted=false,recordDest=null,oscillators=[],noiseSource=null;
+function initAudio(){if(audioCtx)return;audioCtx=new (window.AudioContext||window.webkitAudioContext)();master=audioCtx.createGain();master.gain.value=.32;master.connect(audioCtx.destination);
+ recordDest=audioCtx.createMediaStreamDestination();master.connect(recordDest);
+ const drone1=audioCtx.createOscillator(),drone2=audioCtx.createOscillator(),gain=audioCtx.createGain(),filter=audioCtx.createBiquadFilter();drone1.type='sine';drone2.type='triangle';drone1.frequency.value=49;drone2.frequency.value=51.8;filter.type='lowpass';filter.frequency.value=180;gain.gain.value=.15;drone1.connect(filter);drone2.connect(filter);filter.connect(gain);gain.connect(master);drone1.start();drone2.start();oscillators=[drone1,drone2];
+ // wind-like filtered noise
+ const buffer=audioCtx.createBuffer(1,audioCtx.sampleRate*3,audioCtx.sampleRate),data=buffer.getChannelData(0);for(let i=0;i<data.length;i++)data[i]=Math.random()*2-1;
+ noiseSource=audioCtx.createBufferSource();noiseSource.buffer=buffer;noiseSource.loop=true;const lp=audioCtx.createBiquadFilter();lp.type='lowpass';lp.frequency.value=380;const ng=audioCtx.createGain();ng.gain.value=.055;noiseSource.connect(lp);lp.connect(ng);ng.connect(master);noiseSource.start();
+}
+function sting(freq=72,dur=2,vol=.25){if(!audioCtx||muted)return;const o=audioCtx.createOscillator(),g=audioCtx.createGain();o.type='sawtooth';o.frequency.setValueAtTime(freq,audioCtx.currentTime);o.frequency.exponentialRampToValueAtTime(Math.max(22,freq*.45),audioCtx.currentTime+dur);g.gain.setValueAtTime(vol,audioCtx.currentTime);g.gain.exponentialRampToValueAtTime(.001,audioCtx.currentTime+dur);o.connect(g);g.connect(master);o.start();o.stop(audioCtx.currentTime+dur)}
+function whisper(){if(!audioCtx||muted)return;const o=audioCtx.createOscillator(),g=audioCtx.createGain(),f=audioCtx.createBiquadFilter();o.type='triangle';o.frequency.value=190+Math.random()*80;f.type='bandpass';f.frequency.value=650;g.gain.setValueAtTime(.001,audioCtx.currentTime);g.gain.linearRampToValueAtTime(.06,audioCtx.currentTime+.2);g.gain.exponentialRampToValueAtTime(.001,audioCtx.currentTime+1.8);o.connect(f);f.connect(g);g.connect(master);o.start();o.stop(audioCtx.currentTime+1.8)}
+// Hinglish voice script cue points. Use browser speech synthesis if available.
+const cues=[
+[0,'Raat ke barah baj chuke the. Aarav ki car ek sunsaan road par achanak band ho gayi.'],[18,'Phone mein network nahi tha. Aur saamne... pedon ke beech ek purana ghar dikh raha tha.'],[38,'Usne socha, bas ek raat ki baat hai. Lekin us ghar ke baare mein gaon wale kuch aur hi kehte the.'],
+[62,'Kehte hain, is ghar mein jo bhi raat ko rukta hai... subah uska naam tak yaad nahi rehta.'],[88,'Aarav ne darwaza khatkhataya. Darwaza apne aap dheere se khul gaya.'],[112,'Andar se geeli mitti aur purani lakdi ki smell aa rahi thi. Deewar par ek tasveer latak rahi thi.'],[138,'Tasveer mein ek aurat thi. Aur uske peeche... bilkul Aarav jaisa dikhne wala ek aadmi.'],
+[164,'Tabhi upar ke floor se kisi ke chalne ki awaaz aayi. Ek kadam... phir doosra.'],[188,'Aarav ne torch jalayi. Seedhiyon par koi nahi tha. Lekin deewar par ek naya saaya ban raha tha.'],[210,'Usne peeche mudkar dekha. Darwaze ke paas ek safed chehra hawa mein tair raha tha.'],[230,'Woh bhaaga. Lekin har darwaza usi kamre mein khulta tha.'],[248,'Phir ek fुसफुसाहट sunayi di: Tum ghar aa gaye, Aarav.'],[264,'Aarav jam gaya. Kyunki usne apni maa ki awaaz pehchaan li thi.'],[280,'Subah gaon walon ko ghar ke bahar ek car mili. Andar koi nahi tha.'],[292,'Bas dashboard par ek purani tasveer thi... jisme Aarav bachpan se us ghar ki khidki mein khada tha.'],[300,'Aur us khidki ke peeche... ab koi aur intezaar kar raha hai.']
+];
+let spoken=new Set(),time=0,playing=false,last=performance.now(),recording=null,chunks=[];
+function say(text){if(!('speechSynthesis'in window)||muted)return;const u=new SpeechSynthesisUtterance(text);u.lang='hi-IN';u.rate=.88;u.pitch=.78;u.volume=.85;speechSynthesis.speak(u)}
+function triggerCue(c){subtitle.textContent=c[1];say(c[1]);}
+function setTime(t){time=Math.max(0,Math.min(300,t));const m=String(Math.floor(time/60)).padStart(2,'0'),s=String(Math.floor(time%60)).padStart(2,'0');bar.style.width=(time/300*100)+'%';status.textContent=(playing?'Playing':'Paused')+' · '+m+':'+s+' / 05:00'}
+function sceneAt(t,dt){
+ // camera journey: road approach, porch, interior reveal, ghost encounter, escape, dawn aftermath
+ let x=0,y=3.0,z=15,tx=0,ty=2,tz=-14;
+ if(t<60){z=15-t*.24;y=3.1;tx=0;tz=-14}
+ else if(t<120){z=1-(t-60)*.12;y=2.8;tx=0;tz=-15}
+ else if(t<180){z=-6-(t-120)*.08;y=2.8;tx=0;tz=-15}
+ else if(t<230){z=-12-(t-180)*.03;y=2.5;tx=0;tz=-12}
+ else {z=-13+(t-230)*.18;y=2.7;tx=0;tz=-14}
+ camera.position.lerp(new THREE.Vector3(x,y,z),.035);camera.lookAt(tx,ty,tz);
+ warm.intensity=(t>80&&t<210)?1.5+Math.sin(t*3)*.7:0;
+ ghost.visible=t>195&&t<265;const appear=THREE.MathUtils.clamp((t-195)/8,0,1);ghostMat.opacity=appear*.72;ghost.position.z=-12+Math.sin(t*1.4)*.45;ghost.position.x=Math.sin(t*.9)*.45;ghost.position.y=Math.sin(t*2)*.08;ghost.rotation.y=Math.sin(t)*.18;
+ if(t>225&&t<229)flash.style.opacity=String(Math.max(0,.65-(t-225)*.2));else flash.style.opacity='0';
+ scene.fog.density=t>255?.018:.035;
+ // camera shakes near reveal
+ if(t>205&&t<230){camera.position.x+=(Math.random()-.5)*.045;camera.position.y+=(Math.random()-.5)*.035}
+}
+function animate(now){requestAnimationFrame(animate);const dt=Math.min(.05,(now-last)/1000);last=now;
+ if(playing){time+=dt;if(time>=300){time=300;playing=false;if('speechSynthesis'in window)speechSynthesis.cancel()}setTime(time)}
+ const p=rainGeo.attributes.position.array;for(let i=0;i<rainCount;i++){p[i*3+1]-=dt*13;if(p[i*3+1]<0){p[i*3+1]=18;p[i*3]=(Math.random()-.5)*45}}rainGeo.attributes.position.needsUpdate=true;
+ scene.children.forEach(o=>{if(o.userData.speed){o.position.x+=dt*o.userData.speed;if(o.position.x>14)o.position.x=-14}});
+ sceneAt(time,dt);
+ if(playing){for(const c of cues){if(time>=c[0]&&!spoken.has(c[0])){spoken.add(c[0]);triggerCue(c)}}if(Math.floor(time)===90||Math.floor(time)===164||Math.floor(time)===210)sting(90,2,.15);if(Math.floor(time)===202||Math.floor(time)===248)whisper()}
+ renderer.render(scene,camera);
+}
+requestAnimationFrame(animate);
+function play(){initAudio();audioCtx.resume();if('speechSynthesis'in window)speechSynthesis.resume();if(time>=300){time=0;spoken.clear()}playing=true;last=performance.now();setTime(time)}
+document.querySelector('#play').onclick=play;
+document.querySelector('#pause').onclick=()=>{playing=false;if('speechSynthesis'in window)speechSynthesis.pause();setTime(time)};
+document.querySelector('#restart').onclick=()=>{playing=false;time=0;spoken.clear();subtitle.textContent='Some roads should never be taken after midnight.';if('speechSynthesis'in window)speechSynthesis.cancel();setTime(time)};
+document.querySelector('#sound').onclick=e=>{muted=!muted;e.currentTarget.textContent=muted?'♪ Sound: off':'♪ Sound: on';if(master)master.gain.setTargetAtTime(muted?0:.32,audioCtx.currentTime,.08);if(muted&&'speechSynthesis'in window)speechSynthesis.cancel()};
+document.querySelector('#record').onclick=()=>{if(recording&&recording.state==='recording'){recording.stop();return}initAudio();audioCtx.resume();const stream=renderer.domElement.captureStream(30);recordDest.stream.getAudioTracks().forEach(t=>stream.addTrack(t));chunks=[];let type=MediaRecorder.isTypeSupported('video/webm;codecs=vp9,opus')?'video/webm;codecs=vp9,opus':'video/webm';recording=new MediaRecorder(stream,{mimeType:type});recording.ondataavailable=e=>{if(e.data.size)chunks.push(e.data)};recording.onstop=()=>{const blob=new Blob(chunks,{type:'video/webm'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='the-last-house-horror.webm';a.click();URL.revokeObjectURL(url);document.querySelector('#record').textContent='● Record video'};recording.start();document.querySelector('#record').textContent='■ Stop & save';if(!playing)play()};
+addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight)});
+setTime(0);
+</script>
+</body></html>
