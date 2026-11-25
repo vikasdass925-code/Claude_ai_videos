@@ -1,0 +1,9 @@
+{
+  "name": "the-last-house-horror",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Five-minute Three.js cinematic horror animation",
+  "scripts": {
+    "start": "npx serve ."
+  }
+}
